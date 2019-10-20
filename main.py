@@ -77,7 +77,7 @@ def write_updates(data, project, path):
 def write_about(data, path):
     tree = etree.parse(path, parser)
     description = tree.find(r'./description')
-    description.text = get_features_text(data['features'])
+    description.text = get_features_text(x for x in data['features'] if 'title' in x)
     tree.write(path, encoding='utf-8', xml_declaration=True, pretty_print=True)
 
 
@@ -108,6 +108,8 @@ def get_steam_markup(_data):
     ]
 
     for _feature in data['features']:
+        if 'title' not in _feature:
+            continue
         feature = defaultdict(str, _feature)
         feature_lines = [
             wrap('b', feature['title']),
