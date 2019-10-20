@@ -8,13 +8,21 @@ from lxml.builder import E
 parser = etree.XMLParser(remove_blank_text=True)
 areUpdatesDescending = True
 Project = namedtuple('Project', ['path', 'update_prefix', 'setting_prefix'])
+global_path = r'global.yaml'
+global_data = defaultdict(str)
+if os.path.exists(global_path):
+    with open(global_path, encoding='utf8') as f:
+        global_data = yaml.safe_load(f)
 
 
 def main():
-    # aa_project = Project(r'C:\Dropbox\RimWorld\AssortedAlterations', r'COAssortedAlterations', r'COAA')
-    # write_files(aa_project)
-    # ctf_project = Project(r'C:\Dropbox\RimWorld\CustomThingFilters', r'COCustomThingFilters', r'COCTF')
-    # write_files(ctf_project)
+    projects = [
+        Project(r'C:\Dropbox\RimWorld\AssortedAlterations', r'COAssortedAlterations', r'COAA'),
+        # Project(r'C:\Dropbox\RimWorld\CustomThingFilters', r'COCustomThingFilters', r'COCTF'),
+        # Project(r'C:\Dropbox\RimWorld\ResourceGoalTracker', r'COResourceGoalTracker', r'CORGT'),
+    ]
+    for project in projects:
+        write_files(project)
     pass
 
 
@@ -81,22 +89,39 @@ def write_settings(data, project, path):
     tree.write(path, encoding='utf-8', xml_declaration=True, pretty_print=True)
 
 
-def get_steam_markup(data):
-    lines = [data['header']]
+def wrap(tag, text):
+    if text:
+        return "[{tag}]{text}[/{tag}]".format(**locals())
+    return ""
+
+
+def get_steam_markup(_data):
+    data = defaultdict(str, _data)
+    lines = [
+        data['desc'],   # first for Steam previews
+        global_data['header'].format(**data),
+        wrap('h1', data['heading']),
+        '\b',
+        wrap('i', data['flavor']),
+    ]
+
     for _feature in data['features']:
         feature = defaultdict(str, _feature)
-        feature_markup = ["[u]{}[/u]".format(feature['title'])]
-        flavor = feature['flavor']
-        if flavor:
-            feature_markup.append("[i]{}[/i]".format(flavor))
-        desc = feature['desc']
-        if desc:
-            feature_markup.append("{}{}".format("\n" if '\n' in flavor else "", desc))
+        feature_lines = [
+            wrap('b', feature['title']),
+            wrap('i', feature['flavor']),
+            " " if feature['desc'] and '\n' in feature['flavor'] else "",
+            feature['desc'],
+        ]
 
-        lines.append("\n".join(feature_markup))
+        features = "\n".join([x for x in feature_lines if x])
+        lines.append(features)
 
-    lines.append(data['footer'])
-    result = "\n\n".join(lines)
+    lines += [
+        data['footer'],
+        global_data['footer'].format(**data),
+    ]
+    result = "\n\n".join([x for x in lines if x]).replace("\n\b\n\n", "")
     return result
 
 
