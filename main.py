@@ -49,8 +49,8 @@ def write_files(project):
 
 def write_updates(data, project, path):
     def version_features():
-        versions = set(f['at'] for f in data['features'] if 'at' in f)
-        result = {v: [f for f in data['features'] if 'at' in f and f['at'] == v] for v in versions}
+        versions = set(x['at'] for x in data['features'] if 'at' in x)
+        result = {v: [f for f in data['features'] if f.get('at') == v] for v in versions}
         return result
 
     tree = etree.parse(path, parser)
@@ -70,14 +70,14 @@ def write_updates(data, project, path):
             else:
                 tree.getroot().append(element)
 
-        content.text = get_features_text(features)
+        content.text = text_from_lines(get_xml_features(features), for_xml=True)
     tree.write(path, encoding='utf-8', xml_declaration=True, pretty_print=True)
 
 
 def write_about(data, path):
     tree = etree.parse(path, parser)
     description = tree.find(r'./description')
-    description.text = get_features_text(x for x in data['features'] if 'title' in x)
+    description.text = text_from_lines(get_xml_features(x for x in data['features'] if 'title' in x), for_xml=True)
     tree.write(path, encoding='utf-8', xml_declaration=True, pretty_print=True)
 
 
@@ -92,24 +92,52 @@ def write_settings(data, project, path):
 
 
 def wrap(tag, text):
-    if text:
-        return "[{tag}]{text}[/{tag}]".format(**locals())
-    return ""
+    close_tag = tag.split(r'=', 1)[0]
+    return "[{tag}]{text}[/{close_tag}]".format(**locals()) if text else ""
 
 
 def get_steam_markup(_data):
     data = defaultdict(str, _data)
     lines = [
-        data['desc'],   # first for Steam previews
-        global_data['header'].format(**data),
-        wrap('h1', data['heading']),
-        '\b',
-        wrap('i', data['flavor']),
+        [
+            data['desc'],  # first for Steam previews
+            global_data['header'].format(**data),
+        ],
+        [
+            wrap('h1', data['heading']),
+            '\b',
+            wrap('i', data['flavor']),
+        ] + get_markup_features(x for x in data['features'] if 'title' in x),
+        [data['footer']],
+        [global_data['footer'].format(**data)],
     ]
+    result = text_from_lines(lines)
+    return result
 
-    for _feature in data['features']:
-        if 'title' not in _feature:
-            continue
+
+def text_from_lines(lines, for_xml=False):
+    def depth(list_):
+        return max(map(depth, list_)) + 1 if isinstance(list_, list) else 0
+
+    def recurse(list_, count):
+        if isinstance(list_, list):
+            lines_ = [y for y in (recurse(x, count - 1) for x in list_ if x) if y]
+            result_ = ("\n" * count).join(lines_)
+            # treat \b as symbolically "backspacing" newlines between elements
+            result_ = re.sub('\n{{0,{count}}}\b\n{{0,{count}}}'.format(**locals()), "\n" * (count - 1), result_)
+            return result_
+        return list_
+
+    depth = depth(lines)
+    result = recurse(lines, depth)
+    if for_xml:
+        result = etree.CDATA(markup_to_xml(result) + "\n")  # without ending \n text can be cut off
+    return result
+
+
+def get_markup_features(features):
+    result = []
+    for _feature in features:
         feature = defaultdict(str, _feature)
         feature_lines = [
             wrap('b', feature['title']),
@@ -117,38 +145,31 @@ def get_steam_markup(_data):
             " " if feature['desc'] and '\n' in feature['flavor'] else "",
             feature['desc'],
         ]
-
-        features = "\n".join([x for x in feature_lines if x])
-        lines.append(features)
-
-    lines += [
-        data['footer'],
-        global_data['footer'].format(**data),
-    ]
-    result = "\n\n".join([x for x in lines if x]).replace("\n\b\n\n", "")
+        result.append(feature_lines)
     return result
 
 
 def markup_to_xml(text):
     result = text.strip()
     result = re.sub(r'\[url=.*?](.*?)\[/url]', r'<color=grey><b>\1</b></color>', result, flags=re.DOTALL)
-    result = re.sub(r'\[b](.*?)\[/b]', r'<b>\1</b>', result, flags=re.DOTALL)
-    result = re.sub(r'\[i](.*?)\[/i]', r'<i>\1</i>', result, flags=re.DOTALL)
-    result = re.sub(r'\[u](.*?)\[/u]', r'<u>\1</u>', result, flags=re.DOTALL)
+    result = re.sub(r'\[u](.*?)\[/u]', r'<color=grey>\1</color>', result, flags=re.DOTALL)
+
+    count = -1
+    while count != 0:
+        result, count = re.subn(r'\[(\w+)(=\w+)?](.*?)\[/\1]', r'<\1\2>\3</\1>', result, flags=re.DOTALL)
     return result
 
 
-def get_features_text(features):
-    lines = []
+def get_xml_features(features):
+    result = []
     for _feature in features:
         feature = defaultdict(str, _feature)
-        feature_xml = ["<color=teal><b>{}</b></color>".format(markup_to_xml(feature['title']))]
-        if 'desc' in feature:
-            feature_xml.append(markup_to_xml(feature['desc']))
-        elif 'flavor' in feature:
-            feature_xml.append("<i>{}</i>".format(markup_to_xml(feature['flavor'])))
-        lines.append("\n".join(feature_xml))
-    result = etree.CDATA("\n\n".join(lines) + "\n")  # without ending \n the text can get cutoff
+        feature_lines = [
+            wrap('color=teal', wrap('b', feature['title'])),
+            feature['desc'],
+            wrap('i', feature['flavor']) if not feature['desc'] else "",
+        ]
+        result.append(feature_lines)
     return result
 
 
