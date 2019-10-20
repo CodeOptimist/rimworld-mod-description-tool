@@ -18,8 +18,8 @@ if os.path.exists(global_path):
 def main():
     projects = [
         Project(r'C:\Dropbox\RimWorld\AssortedAlterations', r'COAssortedAlterations', r'COAA'),
-        # Project(r'C:\Dropbox\RimWorld\CustomThingFilters', r'COCustomThingFilters', r'COCTF'),
-        # Project(r'C:\Dropbox\RimWorld\ResourceGoalTracker', r'COResourceGoalTracker', r'CORGT'),
+        Project(r'C:\Dropbox\RimWorld\CustomThingFilters', r'COCustomThingFilters', r'COCTF'),
+        Project(r'C:\Dropbox\RimWorld\ResourceGoalTracker', r'COResourceGoalTracker', r'CORGT'),
     ]
     for project in projects:
         write_files(project)
@@ -32,16 +32,18 @@ def write_files(project):
         data = yaml.safe_load(f)
 
     settings_path = os.path.join(project.path, r'Languages\English\Keyed\Settings.xml')
-    write_settings(data, project, settings_path)
+    if os.path.exists(settings_path):
+        write_settings(data, project, settings_path)
     about_path = os.path.join(project.path, r'About\About.xml')
     write_about(data, about_path)
     updates_path = os.path.join(project.path, r'Defs\UpdateFeatureDefs\UpdateFeatures.xml')
     write_updates(data, project, updates_path)
 
-    # ahk = Script(ahk_path=os.path.join(os.environ['ProgramW6432'], r'AutoHotkey\AutoHotkey.exe'))
-    # ahk.set('clipboard', get_steam_markup(data))
+    markup = get_steam_markup(data)
+    # ahk = Script()
+    # ahk.set('clipboard', markup)
     print('-' * 100)
-    print(get_steam_markup(data))
+    print(markup)
     print('-' * 100)
 
 
@@ -58,7 +60,7 @@ def write_updates(data, project, path):
             content = etree.Element("content")
             element = E.HugsLibUpdateFeatureDef(
                 {'ParentName': "UpdateFeatureBase"},
-                E.defName(project.update_prefix + version.replace(r'.', r'_')),
+                E.defName(project.update_prefix + '_' + version.replace(r'.', r'_')),
                 E.assemblyVersion(version),
                 content,
             )
