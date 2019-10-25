@@ -27,26 +27,46 @@ def main():
     pass
 
 
-def write_files(project):
-    global mod_yaml
-    data_path = os.path.join(project.path, r'public.yaml')
-    with open(data_path, encoding='utf8') as f:
-        mod_yaml = yaml.safe_load(f)
+def write_settings(project, path):
+    tree = etree.parse(path)
+    root = tree.getroot()
+    root.clear()
+    elements = get_setting_elements(project)
+    for element in elements:
+        root.append(element)
+    tree.write(path, encoding='utf-8', xml_declaration=True, pretty_print=True)
 
-    settings_path = os.path.join(project.path, r'Languages\English\Keyed\Settings.xml')
-    if os.path.exists(settings_path):
-        write_settings(project, settings_path)
-    about_path = os.path.join(project.path, r'About\About.xml')
-    write_about(about_path)
-    updates_path = os.path.join(project.path, r'Defs\UpdateFeatureDefs\UpdateFeatures.xml')
-    write_updates(project, updates_path)
 
-    markup = get_steam_markup()
-    # ahk = Script()
-    # ahk.set('clipboard', markup)
-    print('-' * 100)
-    print(markup)
-    print('-' * 100)
+def get_setting_elements(project):
+    def val(a, b):
+        # so we can give a setting key an explicit blank value instead of inheriting the feature value
+        if a == "":
+            return ""
+        return a or b
+
+    out_settings = defaultdict(lambda: defaultdict(str))
+    for feature in mod_yaml['features']:
+        for setting in feature.get('settings', []):
+            name = setting['name']
+            out_settings[name]['title'] += (val(setting.get('title'), feature['title']))
+            out_settings[name]['desc'] += (val(setting.get('desc'), feature.get('desc')))
+
+    result = []
+    for k in out_settings:
+        title = etree.Element("{}_{}Setting_title".format(project.setting_prefix, k))
+        title.text = etree.CDATA(markup_to_xml(re.sub(r'\.$', r'', out_settings[k]['title'])))
+        result.append(title)
+        desc = etree.Element("{}_{}Setting_description".format(project.setting_prefix, k))
+        desc.text = etree.CDATA(markup_to_xml(out_settings[k]['desc']))
+        result.append(desc)
+    return result
+
+
+def write_about(path):
+    tree = etree.parse(path, parser)
+    description = tree.find(r'./description')
+    description.text = text_from_lines(get_xml_features(x for x in mod_yaml['features'] if 'title' in x), for_xml=True)
+    tree.write(path, encoding='utf-8', xml_declaration=True, pretty_print=True)
 
 
 def write_updates(project, path):
@@ -76,21 +96,26 @@ def write_updates(project, path):
     tree.write(path, encoding='utf-8', xml_declaration=True, pretty_print=True)
 
 
-def write_about(path):
-    tree = etree.parse(path, parser)
-    description = tree.find(r'./description')
-    description.text = text_from_lines(get_xml_features(x for x in mod_yaml['features'] if 'title' in x), for_xml=True)
-    tree.write(path, encoding='utf-8', xml_declaration=True, pretty_print=True)
+def write_files(project):
+    global mod_yaml
+    data_path = os.path.join(project.path, r'public.yaml')
+    with open(data_path, encoding='utf8') as f:
+        mod_yaml = yaml.safe_load(f)
 
+    settings_path = os.path.join(project.path, r'Languages\English\Keyed\Settings.xml')
+    if os.path.exists(settings_path):
+        write_settings(project, settings_path)
+    about_path = os.path.join(project.path, r'About\About.xml')
+    write_about(about_path)
+    updates_path = os.path.join(project.path, r'Defs\UpdateFeatureDefs\UpdateFeatures.xml')
+    write_updates(project, updates_path)
 
-def write_settings(project, path):
-    tree = etree.parse(path)
-    root = tree.getroot()
-    root.clear()
-    elements = get_setting_elements(project)
-    for element in elements:
-        root.append(element)
-    tree.write(path, encoding='utf-8', xml_declaration=True, pretty_print=True)
+    markup = get_steam_markup()
+    # ahk = Script()
+    # ahk.set('clipboard', markup)
+    print('-' * 100)
+    print(markup)
+    print('-' * 100)
 
 
 def wrap(tag, text):
@@ -169,31 +194,6 @@ def get_xml_features(features):
             wrap('i', feature.get('flavor')) if not feature.get('desc') else "",
         ]
         result.append(feature_lines)
-    return result
-
-
-def get_setting_elements(project):
-    def val(a, b):
-        # so we can give a setting key an explicit blank value instead of inheriting the feature value
-        if a == "":
-            return ""
-        return a or b
-
-    out_settings = defaultdict(lambda: defaultdict(str))
-    for feature in mod_yaml['features']:
-        for setting in feature.get('settings', []):
-            name = setting['name']
-            out_settings[name]['title'] += (val(setting.get('title'), feature['title']))
-            out_settings[name]['desc'] += (val(setting.get('desc'), feature.get('desc')))
-
-    result = []
-    for k in out_settings:
-        title = etree.Element("{}_{}Setting_title".format(project.setting_prefix, k))
-        title.text = etree.CDATA(markup_to_xml(re.sub(r'\.$', r'', out_settings[k]['title'])))
-        result.append(title)
-        desc = etree.Element("{}_{}Setting_description".format(project.setting_prefix, k))
-        desc.text = etree.CDATA(markup_to_xml(out_settings[k]['desc']))
-        result.append(desc)
     return result
 
 
