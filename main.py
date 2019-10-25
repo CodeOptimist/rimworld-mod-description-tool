@@ -1,14 +1,11 @@
 # Copyright (C) 2019  Christopher S. Galpin.  See /NOTICE.
-import os, re, yaml
+import os, re, yaml, pathlib, sys
 # from autohotkey import Script
-from collections import defaultdict, namedtuple
+from collections import defaultdict
 from lxml import etree
 from lxml.builder import E
 
-parser = etree.XMLParser(remove_blank_text=True)
-areUpdatesDescending = True
-Project = namedtuple('Project', ['path', 'update_prefix', 'setting_prefix'])
-_global_path = r'global.yaml'
+_global_path = os.path.join(os.getcwd(), r'global.yaml')
 global_yaml = {}
 if os.path.exists(_global_path):
     with open(_global_path, encoding='utf-8') as f:
@@ -17,105 +14,111 @@ mod_yaml = {}
 
 
 def main():
-    projects = [
-        Project(r'C:\Dropbox\RimWorld\AssortedAlterations', r'COAssortedAlterations', r'COAA'),
-        Project(r'C:\Dropbox\RimWorld\CustomThingFilters', r'COCustomThingFilters', r'COCTF'),
-        Project(r'C:\Dropbox\RimWorld\ResourceGoalTracker', r'COResourceGoalTracker', r'CORGT'),
-    ]
-    for project in projects:
-        write_files(project)
-    pass
+    global mod_yaml
+    for yaml_path in sys.argv[1:]:
+        if not os.path.isabs(yaml_path):
+            yaml_path = os.path.join(os.getcwd(), yaml_path)
+        if os.path.isdir(yaml_path):
+            yaml_path = os.path.join(yaml_path, r'public.yaml')
+        with open(yaml_path, encoding='utf-8') as f:
+            mod_yaml = yaml.safe_load(f)
+
+        markup = get_steam_markup()
+        about = get_about()
+        updates = get_updates()
+        settings = get_settings()
+
+        dir_name = os.path.dirname(yaml_path)
+        write_xml(dir_name, [mod_yaml.get('about_path'), r'About\About.xml'], about)
+        if updates.getchildren():
+            write_xml(dir_name, [
+                mod_yaml.get('updates_path'),
+                r'Defs\UpdateFeatures.xml',
+                r'Defs\UpdateFeatureDefs\UpdateFeatures.xml',
+            ], updates)
+        if settings.getchildren():
+            write_xml(dir_name, [mod_yaml.get('settings_path'), r'Languages\English\Keyed\Settings.xml'], settings)
+
+        # ahk = Script()
+        # ahk.set('clipboard', markup)
+        print('-' * 100)
+        print(markup)
+        print('-' * 100)
 
 
-def write_settings(project, path):
-    tree = etree.parse(path)
-    root = tree.getroot()
-    root.clear()
-    elements = get_setting_elements(project)
-    for element in elements:
-        root.append(element)
-    tree.write(path, encoding='utf-8', xml_declaration=True, pretty_print=True)
-
-
-def get_setting_elements(project):
+def get_settings():
     def val(a, b):
         # so we can give a setting key an explicit blank value instead of inheriting the feature value
-        if a == "":
-            return ""
-        return a or b
+        return "" if a == "" else (a or b)
 
-    out_settings = defaultdict(lambda: defaultdict(str))
+    result = E.LanguageData()
+    gathered = defaultdict(lambda: defaultdict(str))
     for feature in mod_yaml['features']:
         for setting in feature.get('settings', []):
             name = setting['name']
-            out_settings[name]['title'] += (val(setting.get('title'), feature['title']))
-            out_settings[name]['desc'] += (val(setting.get('desc'), feature.get('desc')))
+            gathered[name]['title'] += (val(setting.get('title'), feature['title']))
+            gathered[name]['desc'] += (val(setting.get('desc'), feature.get('desc')))
 
-    result = []
-    for k in out_settings:
-        title = etree.Element("{}_{}Setting_title".format(project.setting_prefix, k))
-        title.text = etree.CDATA(markup_to_xml(re.sub(r'\.$', r'', out_settings[k]['title'])))
+    for k in gathered:
+        title = etree.Element("{}_{}Setting_title".format(mod_yaml['prefix'], k))
+        title.text = etree.CDATA(markup_to_xml(re.sub(r'\.$', r'', gathered[k]['title'])))
         result.append(title)
-        desc = etree.Element("{}_{}Setting_description".format(project.setting_prefix, k))
-        desc.text = etree.CDATA(markup_to_xml(out_settings[k]['desc']))
+        desc = etree.Element("{}_{}Setting_description".format(mod_yaml['prefix'], k))
+        desc.text = etree.CDATA(markup_to_xml(gathered[k]['desc']))
         result.append(desc)
+        
     return result
 
 
-def write_about(path):
-    tree = etree.parse(path, parser)
-    description = tree.find(r'./description')
-    description.text = text_from_lines(get_xml_features(x for x in mod_yaml['features'] if 'title' in x), for_xml=True)
-    tree.write(path, encoding='utf-8', xml_declaration=True, pretty_print=True)
+def get_about():
+    supported_versions = etree.Element("supportedVersions")
+    for v in mod_yaml['supported_versions']:
+        supported_versions.append(E.li(str(v)))
+    result = E.ModMetaData(
+        E.name(mod_yaml['name']),
+        E.author(mod_yaml.get('author', global_yaml['author'])),
+        E.url(mod_yaml.get('url', mod_yaml.get('repo'))),
+        supported_versions,
+        E.description(text_from_lines(get_xml_features(x for x in mod_yaml['features'] if 'title' in x), for_xml=True))
+    )
+    return result
 
 
-def write_updates(project, path):
+def get_updates():
+    result = E.Defs(
+        E("HugsLib.UpdateFeatureDef",
+          {'Abstract': "true", 'Name': "UpdateFeatureBase"},
+          E.modNameReadable(mod_yaml['name']),
+          E.modIdentifier(mod_yaml['identifier']),
+          E.linkUrl(mod_yaml.get('url', mod_yaml.get('repo'))),
+          )
+    )
+
     def version_features():
         versions = set(x['at'] for x in mod_yaml['features'] if 'at' in x)
-        result = {v: [f for f in mod_yaml['features'] if f.get('at') == v] for v in versions}
-        return result
+        _version_features = {v: [f for f in mod_yaml['features'] if f.get('at') == v] for v in versions}
+        return _version_features
 
-    tree = etree.parse(path, parser)
-    for version, features in version_features().items():
-        content = tree.find(r"./HugsLib.UpdateFeatureDef[assemblyVersion='{}']/content".format(version))
-        if content is None:
-            content = etree.Element("content")
-            element = E.HugsLibUpdateFeatureDef(
-                {'ParentName': "UpdateFeatureBase"},
-                E.defName(project.update_prefix + '_' + version.replace(r'.', r'_')),
-                E.assemblyVersion(version),
-                content,
-            )
-            element.tag = "HugsLib.UpdateFeatureDef"  # add the period
-            if areUpdatesDescending:
-                tree.getroot().insert(1, element)
-            else:
-                tree.getroot().append(element)
-
-        content.text = text_from_lines(get_xml_features(features), for_xml=True)
-    tree.write(path, encoding='utf-8', xml_declaration=True, pretty_print=True)
+    reverse = mod_yaml.get('descending_updates', global_yaml.get('descending_updates', True))
+    for version, features in sorted(version_features().items(), reverse=reverse):
+        element = E("HugsLib.UpdateFeatureDef",
+                    {'ParentName': "UpdateFeatureBase"},
+                    E.defName(mod_yaml['identifier'] + '_' + version.replace(r'.', r'_')),
+                    E.assemblyVersion(version),
+                    E.content(text_from_lines(get_xml_features(features), for_xml=True)),
+                    )
+        result.append(element)
+    return result
 
 
-def write_files(project):
-    global mod_yaml
-    data_path = os.path.join(project.path, r'public.yaml')
-    with open(data_path, encoding='utf8') as f:
-        mod_yaml = yaml.safe_load(f)
+def write_xml(base_path, rel_paths, root):
+    paths = [os.path.join(base_path, rel_path) for rel_path in rel_paths if rel_path]
+    exist_paths = (path for path in paths if os.path.exists(path))
+    path = next(exist_paths, None) or paths[0]
 
-    settings_path = os.path.join(project.path, r'Languages\English\Keyed\Settings.xml')
-    if os.path.exists(settings_path):
-        write_settings(project, settings_path)
-    about_path = os.path.join(project.path, r'About\About.xml')
-    write_about(about_path)
-    updates_path = os.path.join(project.path, r'Defs\UpdateFeatureDefs\UpdateFeatures.xml')
-    write_updates(project, updates_path)
-
-    markup = get_steam_markup()
-    # ahk = Script()
-    # ahk.set('clipboard', markup)
-    print('-' * 100)
-    print(markup)
-    print('-' * 100)
+    pathlib.Path(os.path.dirname(path)).mkdir(parents=True, exist_ok=True)
+    with open(path, mode='wb') as f:
+        f.write(etree.tostring(root, xml_declaration=True, encoding='UTF-8', pretty_print=True))
 
 
 def wrap(tag, text):
@@ -148,10 +151,10 @@ def text_from_lines(lines, for_xml=False):
     def recurse(list_, count):
         if isinstance(list_, list):
             lines_ = [y for y in (recurse(x, count - 1) for x in list_ if x) if y]
-            result_ = ("\n" * count).join(lines_)
+            text = ("\n" * count).join(lines_)
             # treat \b as symbolically "backspacing" newlines between elements
-            result_ = re.sub('\n{{0,{count}}}\b\n{{0,{count}}}'.format(**locals()), "\n" * (count - 1), result_)
-            return result_
+            text = re.sub('\n{{0,{count}}}\b\n{{0,{count}}}'.format(**locals()), "\n" * (count - 1), text)
+            return text
         return list_
 
     depth = depth(lines)
