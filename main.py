@@ -9,10 +9,11 @@ parser = etree.XMLParser(remove_blank_text=True)
 areUpdatesDescending = True
 Project = namedtuple('Project', ['path', 'update_prefix', 'setting_prefix'])
 global_path = r'global.yaml'
-global_data = defaultdict(str)
+global_yaml = defaultdict(str)
 if os.path.exists(global_path):
     with open(global_path, encoding='utf8') as f:
-        global_data = yaml.safe_load(f)
+        global_yaml = yaml.safe_load(f)
+mod_yaml = {}
 
 
 def main():
@@ -27,19 +28,20 @@ def main():
 
 
 def write_files(project):
+    global mod_yaml
     data_path = os.path.join(project.path, r'public.yaml')
     with open(data_path, encoding='utf8') as f:
-        data = yaml.safe_load(f)
+        mod_yaml = yaml.safe_load(f)
 
     settings_path = os.path.join(project.path, r'Languages\English\Keyed\Settings.xml')
     if os.path.exists(settings_path):
-        write_settings(data, project, settings_path)
+        write_settings(project, settings_path)
     about_path = os.path.join(project.path, r'About\About.xml')
-    write_about(data, about_path)
+    write_about(about_path)
     updates_path = os.path.join(project.path, r'Defs\UpdateFeatureDefs\UpdateFeatures.xml')
-    write_updates(data, project, updates_path)
+    write_updates(project, updates_path)
 
-    markup = get_steam_markup(data)
+    markup = get_steam_markup()
     # ahk = Script()
     # ahk.set('clipboard', markup)
     print('-' * 100)
@@ -47,10 +49,10 @@ def write_files(project):
     print('-' * 100)
 
 
-def write_updates(data, project, path):
+def write_updates(project, path):
     def version_features():
-        versions = set(x['at'] for x in data['features'] if 'at' in x)
-        result = {v: [f for f in data['features'] if f.get('at') == v] for v in versions}
+        versions = set(x['at'] for x in mod_yaml['features'] if 'at' in x)
+        result = {v: [f for f in mod_yaml['features'] if f.get('at') == v] for v in versions}
         return result
 
     tree = etree.parse(path, parser)
@@ -74,18 +76,18 @@ def write_updates(data, project, path):
     tree.write(path, encoding='utf-8', xml_declaration=True, pretty_print=True)
 
 
-def write_about(data, path):
+def write_about(path):
     tree = etree.parse(path, parser)
     description = tree.find(r'./description')
-    description.text = text_from_lines(get_xml_features(x for x in data['features'] if 'title' in x), for_xml=True)
+    description.text = text_from_lines(get_xml_features(x for x in mod_yaml['features'] if 'title' in x), for_xml=True)
     tree.write(path, encoding='utf-8', xml_declaration=True, pretty_print=True)
 
 
-def write_settings(data, project, path):
+def write_settings(project, path):
     tree = etree.parse(path)
     root = tree.getroot()
     root.clear()
-    elements = get_setting_elements(data, project)
+    elements = get_setting_elements(project)
     for element in elements:
         root.append(element)
     tree.write(path, encoding='utf-8', xml_declaration=True, pretty_print=True)
@@ -96,20 +98,20 @@ def wrap(tag, text):
     return "[{tag}]{text}[/{close_tag}]".format(**locals()) if text else ""
 
 
-def get_steam_markup(_data):
-    data = defaultdict(str, _data)
+def get_steam_markup():
+    mod_yaml = defaultdict(str, globals()['mod_yaml'])
     lines = [
         [
-            data['desc'],  # first for Steam previews
-            global_data['header'].format(**data),
+            mod_yaml['desc'],  # first for Steam previews
+            global_yaml['header'].format(**mod_yaml),
         ],
         [
-            wrap('h1', data['heading']),
+            wrap('h1', mod_yaml['heading']),
             '\b',
-            wrap('i', data['flavor']),
-        ] + get_markup_features(x for x in data['features'] if 'title' in x),
-        [data['footer']],
-        [global_data['footer'].format(**data)],
+            wrap('i', mod_yaml['flavor']),
+        ] + get_markup_features(x for x in mod_yaml['features'] if 'title' in x),
+        [mod_yaml['footer']],
+        [global_yaml['footer'].format(**mod_yaml)],
     ]
     result = text_from_lines(lines)
     return result
@@ -173,7 +175,7 @@ def get_xml_features(features):
     return result
 
 
-def get_setting_elements(data, project):
+def get_setting_elements(project):
     def val(a, b):
         # so we can give a blank key in yaml to avoid inheritance
         if a is None:
@@ -181,7 +183,7 @@ def get_setting_elements(data, project):
         return a or b
 
     out_settings = defaultdict(lambda: defaultdict(str))
-    for _feature in data['features']:
+    for _feature in mod_yaml['features']:
         feature = defaultdict(str, _feature)
         for _setting in feature['settings']:
             setting = defaultdict(str, _setting)
