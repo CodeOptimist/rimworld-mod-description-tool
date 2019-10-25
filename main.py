@@ -8,10 +8,10 @@ from lxml.builder import E
 parser = etree.XMLParser(remove_blank_text=True)
 areUpdatesDescending = True
 Project = namedtuple('Project', ['path', 'update_prefix', 'setting_prefix'])
-global_path = r'global.yaml'
-global_yaml = defaultdict(str)
-if os.path.exists(global_path):
-    with open(global_path, encoding='utf8') as f:
+_global_path = r'global.yaml'
+global_yaml = {}
+if os.path.exists(_global_path):
+    with open(_global_path, encoding='utf-8') as f:
         global_yaml = yaml.safe_load(f)
 mod_yaml = {}
 
@@ -99,19 +99,18 @@ def wrap(tag, text):
 
 
 def get_steam_markup():
-    mod_yaml = defaultdict(str, globals()['mod_yaml'])
     lines = [
         [
-            mod_yaml['desc'],  # first for Steam previews
-            global_yaml['header'].format(**mod_yaml),
+            mod_yaml.get('desc'),  # first for Steam previews
+            global_yaml.get('header', "").format(**mod_yaml),
         ],
         [
-            wrap('h1', mod_yaml['heading']),
+            wrap('h1', mod_yaml.get('heading')),
             '\b',
-            wrap('i', mod_yaml['flavor']),
+            wrap('i', mod_yaml.get('flavor')),
         ] + get_markup_features(x for x in mod_yaml['features'] if 'title' in x),
-        [mod_yaml['footer']],
-        [global_yaml['footer'].format(**mod_yaml)],
+        [mod_yaml.get('footer')],
+        [global_yaml.get('footer', "").format(**mod_yaml)],
     ]
     result = text_from_lines(lines)
     return result
@@ -139,13 +138,12 @@ def text_from_lines(lines, for_xml=False):
 
 def get_markup_features(features):
     result = []
-    for _feature in features:
-        feature = defaultdict(str, _feature)
+    for feature in features:
         feature_lines = [
-            wrap('b', feature['title']),
-            wrap('i', feature['flavor']),
-            " " if feature['desc'] and '\n' in feature['flavor'] else "",
-            feature['desc'],
+            wrap('b', feature.get('title')),
+            wrap('i', feature.get('flavor')),
+            " " if feature.get('desc') and '\n' in feature.get('flavor', "") else "",
+            feature.get('desc'),
         ]
         result.append(feature_lines)
     return result
@@ -164,12 +162,11 @@ def markup_to_xml(text):
 
 def get_xml_features(features):
     result = []
-    for _feature in features:
-        feature = defaultdict(str, _feature)
+    for feature in features:
         feature_lines = [
-            wrap('color=teal', wrap('b', feature['title'])),
-            feature['desc'],
-            wrap('i', feature['flavor']) if not feature['desc'] else "",
+            wrap('color=teal', wrap('b', feature.get('title'))),
+            feature.get('desc'),
+            wrap('i', feature.get('flavor')) if not feature.get('desc') else "",
         ]
         result.append(feature_lines)
     return result
@@ -177,19 +174,17 @@ def get_xml_features(features):
 
 def get_setting_elements(project):
     def val(a, b):
-        # so we can give a blank key in yaml to avoid inheritance
-        if a is None:
+        # so we can give a setting key an explicit blank value instead of inheriting the feature value
+        if a == "":
             return ""
         return a or b
 
     out_settings = defaultdict(lambda: defaultdict(str))
-    for _feature in mod_yaml['features']:
-        feature = defaultdict(str, _feature)
-        for _setting in feature['settings']:
-            setting = defaultdict(str, _setting)
+    for feature in mod_yaml['features']:
+        for setting in feature.get('settings', []):
             name = setting['name']
-            out_settings[name]['title'] += (val(setting['title'], feature['title']))
-            out_settings[name]['desc'] += (val(setting['desc'], feature['desc']))
+            out_settings[name]['title'] += (val(setting.get('title'), feature['title']))
+            out_settings[name]['desc'] += (val(setting.get('desc'), feature.get('desc')))
 
     result = []
     for k in out_settings:
