@@ -46,27 +46,71 @@ def main():
         print('-' * 100)
 
 
-def get_settings():
-    def val(a, b):
-        # so we can give a setting key an explicit blank value instead of inheriting the feature value
-        return "" if a == "" else (a or b)
+def wrap(tag, text):
+    close_tag = tag.split(r'=', 1)[0]
+    return "[{tag}]{text}[/{close_tag}]".format(**locals()) if text else ""
 
-    result = E.LanguageData()
-    gathered = defaultdict(lambda: defaultdict(str))
-    for feature in mod_yaml['features']:
-        for setting in feature.get('settings', []):
-            name = setting['name']
-            gathered[name]['title'] += (val(setting.get('title'), feature['title']))
-            gathered[name]['desc'] += (val(setting.get('desc'), feature.get('desc')))
 
-    for k in gathered:
-        title = etree.Element("{}_{}Setting_title".format(mod_yaml['prefix'], k))
-        title.text = etree.CDATA(markup_to_xml(re.sub(r'\.$', r'', gathered[k]['title'])))
-        result.append(title)
-        desc = etree.Element("{}_{}Setting_description".format(mod_yaml['prefix'], k))
-        desc.text = etree.CDATA(markup_to_xml(gathered[k]['desc']))
-        result.append(desc)
-        
+def text_from_lines(lines, for_xml=False):
+    def depth(list_):
+        return max(map(depth, list_)) + 1 if isinstance(list_, list) else 0
+
+    def recurse(list_, count):
+        if isinstance(list_, list):
+            lines_ = [y for y in (recurse(x, count - 1) for x in list_ if x) if y]
+            text = ("\n" * count).join(lines_)
+            # treat \b as symbolically "backspacing" newlines between elements
+            text = re.sub('\n{{0,{count}}}\b\n{{0,{count}}}'.format(**locals()), "\n" * (count - 1), text)
+            return text
+        return list_
+
+    depth = depth(lines)
+    result = recurse(lines, depth)
+    if for_xml:
+        result = etree.CDATA(markup_to_xml(result) + "\n")  # without ending \n text can be cut off
+    return result
+
+
+def get_markup_features(features):
+    result = []
+    for feature in features:
+        feature_lines = [
+            wrap('b', feature.get('title')),
+            wrap('i', feature.get('flavor')),
+            " " if feature.get('desc') and '\n' in feature.get('flavor', "") else "",
+            feature.get('desc'),
+        ]
+        result.append(feature_lines)
+    return result
+
+
+def get_xml_features(features):
+    result = []
+    for feature in features:
+        feature_lines = [
+            wrap('color=teal', wrap('b', feature.get('title'))),
+            feature.get('desc'),
+            wrap('i', feature.get('flavor')) if not feature.get('desc') else "",
+        ]
+        result.append(feature_lines)
+    return result
+
+
+def get_steam_markup():
+    lines = [
+        [
+            mod_yaml.get('desc'),  # first for Steam previews
+            global_yaml.get('header', "").format(**mod_yaml),
+        ],
+        [
+            wrap('h1', mod_yaml.get('heading')),
+            '\b',
+            wrap('i', mod_yaml.get('flavor')),
+        ] + get_markup_features(x for x in mod_yaml['features'] if 'title' in x),
+        [mod_yaml.get('footer')],
+        [global_yaml.get('footer', "").format(**mod_yaml)],
+    ]
+    result = text_from_lines(lines)
     return result
 
 
@@ -111,6 +155,30 @@ def get_updates():
     return result
 
 
+def get_settings():
+    def val(a, b):
+        # so we can give a setting key an explicit blank value instead of inheriting the feature value
+        return "" if a == "" else (a or b)
+
+    result = E.LanguageData()
+    gathered = defaultdict(lambda: defaultdict(str))
+    for feature in mod_yaml['features']:
+        for setting in feature.get('settings', []):
+            name = setting['name']
+            gathered[name]['title'] += (val(setting.get('title'), feature['title']))
+            gathered[name]['desc'] += (val(setting.get('desc'), feature.get('desc')))
+
+    for k in gathered:
+        title = etree.Element("{}_{}Setting_title".format(mod_yaml['prefix'], k))
+        title.text = etree.CDATA(markup_to_xml(re.sub(r'\.$', r'', gathered[k]['title'])))
+        result.append(title)
+        desc = etree.Element("{}_{}Setting_description".format(mod_yaml['prefix'], k))
+        desc.text = etree.CDATA(markup_to_xml(gathered[k]['desc']))
+        result.append(desc)
+
+    return result
+
+
 def write_xml(base_path, rel_paths, root):
     paths = [os.path.join(base_path, rel_path) for rel_path in rel_paths if rel_path]
     exist_paths = (path for path in paths if os.path.exists(path))
@@ -121,62 +189,6 @@ def write_xml(base_path, rel_paths, root):
         f.write(etree.tostring(root, xml_declaration=True, encoding='UTF-8', pretty_print=True))
 
 
-def wrap(tag, text):
-    close_tag = tag.split(r'=', 1)[0]
-    return "[{tag}]{text}[/{close_tag}]".format(**locals()) if text else ""
-
-
-def get_steam_markup():
-    lines = [
-        [
-            mod_yaml.get('desc'),  # first for Steam previews
-            global_yaml.get('header', "").format(**mod_yaml),
-        ],
-        [
-            wrap('h1', mod_yaml.get('heading')),
-            '\b',
-            wrap('i', mod_yaml.get('flavor')),
-        ] + get_markup_features(x for x in mod_yaml['features'] if 'title' in x),
-        [mod_yaml.get('footer')],
-        [global_yaml.get('footer', "").format(**mod_yaml)],
-    ]
-    result = text_from_lines(lines)
-    return result
-
-
-def text_from_lines(lines, for_xml=False):
-    def depth(list_):
-        return max(map(depth, list_)) + 1 if isinstance(list_, list) else 0
-
-    def recurse(list_, count):
-        if isinstance(list_, list):
-            lines_ = [y for y in (recurse(x, count - 1) for x in list_ if x) if y]
-            text = ("\n" * count).join(lines_)
-            # treat \b as symbolically "backspacing" newlines between elements
-            text = re.sub('\n{{0,{count}}}\b\n{{0,{count}}}'.format(**locals()), "\n" * (count - 1), text)
-            return text
-        return list_
-
-    depth = depth(lines)
-    result = recurse(lines, depth)
-    if for_xml:
-        result = etree.CDATA(markup_to_xml(result) + "\n")  # without ending \n text can be cut off
-    return result
-
-
-def get_markup_features(features):
-    result = []
-    for feature in features:
-        feature_lines = [
-            wrap('b', feature.get('title')),
-            wrap('i', feature.get('flavor')),
-            " " if feature.get('desc') and '\n' in feature.get('flavor', "") else "",
-            feature.get('desc'),
-        ]
-        result.append(feature_lines)
-    return result
-
-
 def markup_to_xml(text):
     result = text.strip()
     result = re.sub(r'\[url=.*?](.*?)\[/url]', r'<color=grey><b>\1</b></color>', result, flags=re.DOTALL)
@@ -185,18 +197,6 @@ def markup_to_xml(text):
     count = -1
     while count != 0:
         result, count = re.subn(r'\[(\w+)(=\w+)?](.*?)\[/\1]', r'<\1\2>\3</\1>', result, flags=re.DOTALL)
-    return result
-
-
-def get_xml_features(features):
-    result = []
-    for feature in features:
-        feature_lines = [
-            wrap('color=teal', wrap('b', feature.get('title'))),
-            feature.get('desc'),
-            wrap('i', feature.get('flavor')) if not feature.get('desc') else "",
-        ]
-        result.append(feature_lines)
     return result
 
 
