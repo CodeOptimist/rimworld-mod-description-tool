@@ -46,76 +46,37 @@ def main():
         print('-' * 100)
 
 
-def wrap(tag, text):
-    close_tag = tag.split(r'=', 1)[0]
-    return "[{tag}]{text}[/{close_tag}]".format(**locals()) if text else ""
+def get_with_features(is_xml, features=None, feature_filter=lambda x: x, format_=None):
+    format_ = global_yaml.get(format_, "{features}")
+    if features is None:
+        features = mod_yaml['features']
+    xml_features = global_yaml.get('xml_feature_format', "<color=teal><b>{title}</b></color>\n{desc}")
+    steam_features = global_yaml.get('steam_feature_format', "[b]{title}[/b]\n[i]{steam}[/i]\n{desc}")
+    feature_format = xml_features if is_xml else steam_features
 
+    lines = []
+    for _feature in filter(feature_filter, features):
+        feature = defaultdict(str, _feature)
+        format_exist = "\n".join(l for l in feature_format.split("\n") if re.sub(r'</?.*?>' if is_xml else r'\[/?.*?]', '', l.format_map(feature)))
+        lines.append(format_exist.format_map(feature) + "\n")
+    feature_text = "\n".join(lines).strip()
+    if is_xml:
+        feature_text = markup_to_xml(feature_text) + "\n"  # without ending \n, text can be cut off
 
-def text_from_lines(lines, for_xml=False):
-    def depth(list_):
-        return max(map(depth, list_)) + 1 if isinstance(list_, list) else 0
-
-    def recurse(list_, count):
-        if isinstance(list_, list):
-            lines_ = [y for y in (recurse(x, count - 1) for x in list_ if x) if y]
-            text = ("\n" * count).join(lines_)
-            # treat \b as symbolically "backspacing" newlines between elements
-            text = re.sub('\n{{0,{count}}}\b\n{{0,{count}}}'.format(**locals()), "\n" * (count - 1), text)
-            return text
-        return list_
-
-    depth = depth(lines)
-    result = recurse(lines, depth)
-    if for_xml:
-        result = etree.CDATA(markup_to_xml(result) + "\n")  # without ending \n text can be cut off
-    return result
-
-
-def get_markup_features(features):
-    result = []
-    for feature in features:
-        feature_lines = [
-            wrap('b', feature.get('title')),
-            wrap('i', feature.get('flavor')),
-            " " if feature.get('desc') and '\n' in feature.get('flavor', "") else "",
-            feature.get('desc'),
-        ]
-        result.append(feature_lines)
-    return result
-
-
-def get_xml_features(features):
-    result = []
-    for feature in features:
-        feature_lines = [
-            wrap('color=teal', wrap('b', feature.get('title'))),
-            feature.get('desc'),
-            wrap('i', feature.get('flavor')) if not feature.get('desc') else "",
-        ]
-        result.append(feature_lines)
-    return result
+    all_data = defaultdict(str, {**mod_yaml, **global_yaml})
+    all_data['features'] = feature_text  # for a friendly key name within formats
+    text = format_.format_map(all_data).format_map(all_data)
+    return text
 
 
 def get_steam_markup():
-    lines = [
-        [
-            mod_yaml.get('desc'),  # first for Steam previews
-            global_yaml.get('header', "").format(**mod_yaml),
-        ],
-        [
-            wrap('h1', mod_yaml.get('heading')),
-            '\b',
-            wrap('i', mod_yaml.get('flavor')),
-        ] + get_markup_features(x for x in mod_yaml['features'] if 'title' in x),
-        [mod_yaml.get('footer')],
-        [global_yaml.get('footer', "").format(**mod_yaml)],
-    ]
-    result = text_from_lines(lines)
+    result = get_with_features(is_xml=False, feature_filter=lambda x: x.get('title'), format_='steam_format')
     return result
 
 
 def get_about():
-    supported_versions = etree.Element("supportedVersions")
+    description = get_with_features(is_xml=True, feature_filter=lambda x: x.get('title'), format_='about_format')
+    supported_versions = E.supportedVersions()
     for v in mod_yaml['supported_versions']:
         supported_versions.append(E.li(str(v)))
     result = E.ModMetaData(
@@ -123,7 +84,7 @@ def get_about():
         E.author(mod_yaml.get('author', global_yaml['author'])),
         E.url(mod_yaml.get('url', mod_yaml.get('repo'))),
         supported_versions,
-        E.description(text_from_lines(get_xml_features(x for x in mod_yaml['features'] if 'title' in x), for_xml=True))
+        E.description(etree.CDATA(description)),
     )
     return result
 
@@ -145,11 +106,12 @@ def get_updates():
 
     reverse = mod_yaml.get('descending_updates', global_yaml.get('descending_updates', True))
     for version, features in sorted(version_features().items(), reverse=reverse):
+        content = get_with_features(is_xml=True, features=features)
         element = E("HugsLib.UpdateFeatureDef",
                     {'ParentName': "UpdateFeatureBase"},
                     E.defName(mod_yaml['identifier'] + '_' + version.replace(r'.', r'_')),
                     E.assemblyVersion(version),
-                    E.content(text_from_lines(get_xml_features(features), for_xml=True)),
+                    E.content(etree.CDATA(content)),
                     )
         result.append(element)
     return result
@@ -160,7 +122,6 @@ def get_settings():
         # so we can give a setting key an explicit blank value instead of inheriting the feature value
         return "" if a == "" else (a or b)
 
-    result = E.LanguageData()
     gathered = defaultdict(lambda: defaultdict(str))
     for feature in mod_yaml['features']:
         for setting in feature.get('settings', []):
@@ -168,12 +129,13 @@ def get_settings():
             gathered[name]['title'] += (val(setting.get('title'), feature['title']))
             gathered[name]['desc'] += (val(setting.get('desc'), feature.get('desc')))
 
-    for k in gathered:
-        title = etree.Element("{}_{}Setting_title".format(mod_yaml['prefix'], k))
-        title.text = etree.CDATA(markup_to_xml(re.sub(r'\.$', r'', gathered[k]['title'])))
+    result = E.LanguageData()
+    for setting in gathered:
+        title = E("{}_{}Setting_title".format(mod_yaml['prefix'], setting),
+                  etree.CDATA(markup_to_xml(re.sub(r'\.$', r'', gathered[setting]['title']))))
         result.append(title)
-        desc = etree.Element("{}_{}Setting_description".format(mod_yaml['prefix'], k))
-        desc.text = etree.CDATA(markup_to_xml(gathered[k]['desc']))
+        desc = E("{}_{}Setting_description".format(mod_yaml['prefix'], setting),
+                 etree.CDATA(markup_to_xml(gathered[setting]['desc'])))
         result.append(desc)
 
     return result
@@ -190,9 +152,11 @@ def write_xml(base_path, rel_paths, root):
 
 
 def markup_to_xml(text):
-    result = text.strip()
-    result = re.sub(r'\[url=.*?](.*?)\[/url]', r'<color=grey><b>\1</b></color>', result, flags=re.DOTALL)
-    result = re.sub(r'\[u](.*?)\[/u]', r'<color=grey>\1</color>', result, flags=re.DOTALL)
+    result = text
+    url_format = global_yaml.get('xml_url_format', r'<color=grey><b>{text}</b></color>').format(url=r'\1', text=r'\2')
+    result = re.sub(r'\[url=(.*?)](.*?)\[/url]', url_format, result, flags=re.DOTALL)
+    u_format = global_yaml.get('xml_u_format', r'<color=grey>{text}</color>').format(text=r'\1')
+    result = re.sub(r'\[u](.*?)\[/u]', u_format, result, flags=re.DOTALL)
 
     count = -1
     while count != 0:
