@@ -61,17 +61,16 @@ def prefer_local(key, default=None):
     return mod_yaml.get(key, global_yaml.get('global_' + key, default))
 
 
-def get_with_features(format_, is_xml, features=None, feature_filter=lambda x: x):
+def get_with_features(format_name, features=None, feature_filter=lambda x: x):
     if features is None:
         features = mod_yaml['features']
-    if format_ is None:
-        format_ = "{features}"
 
-    steam_feature_format = prefer_local('steam_feature_format',
-                                        "[b]{feature_title}[/b]\n[i]{feature_steam}[/i]\n{feature_desc}")
-    xml_feature_format = prefer_local('xml_feature_format',
-                                      "<color=white><b>{feature_title}</b></color>\n{feature_desc}")
-    feature_format = xml_feature_format if is_xml else steam_feature_format
+    default_feature_formats = {
+        'steam': "[b]{feature_title}[/b]\n[i]{feature_steam}[/i]\n{feature_desc}",
+        'about': "<color=white><b>{feature_title}</b></color>\n{feature_desc}",
+        'update': "<color=white><b>{feature_title}</b></color>\n{feature_desc}",
+    }
+    feature_format = prefer_local(format_name + '_feature_format', default_feature_formats[format_name])
 
     lines = []
     for feature in filter(feature_filter, features):
@@ -79,29 +78,28 @@ def get_with_features(format_, is_xml, features=None, feature_filter=lambda x: x
         feature_scope = defaultdict(str, {**{'feature_' + k: v for k, v in feature.items()}, **mod_yaml, **global_yaml})
         for line in feature_format.split("\n"):
             text = line.format_map(feature_scope).format_map(feature_scope)
-            inner_text = re.sub(r'</?.*?>' if is_xml else r'\[/?.*?]', '', text)
+            inner_text = re.sub(r'\[/?.*?]' if format_name == 'steam' else r'</?.*?>', '', text)
             if inner_text:
                 feature_lines.append(text)
         lines.append("\n".join(feature_lines))
     features_text = "\n\n".join(lines)
-    if is_xml:
-        features_text = markup_to_xml(features_text)
 
     scope = defaultdict(str, {**mod_yaml, **global_yaml})
     scope['features'] = features_text  # for a friendly key name within formats
-    text = format_.format_map(scope).format_map(scope) + "\n"  # without ending \n, xml text can be cut off
+    format_ = prefer_local(format_name + '_format', "{features}")
+    text = format_.format_map(scope).format_map(scope)
+    if format_name != 'steam':
+        text = markup_to_xml(text) + "\n"  # without ending \n, xml text can be cut off
     return text
 
 
 def get_steam_markup():
-    result = get_with_features(format_=prefer_local('steam_format', "{features}"), is_xml=False,
-                               feature_filter=lambda x: x.get('title'))
+    result = get_with_features('steam', feature_filter=lambda x: x.get('title'))
     return result
 
 
 def get_about():
-    description = get_with_features(format_=prefer_local('about_format', markup_to_xml(prefer_local(
-        'steam_format', "{features}"))), is_xml=True, feature_filter=lambda x: x.get('title'))
+    description = get_with_features('about', feature_filter=lambda x: x.get('title'))
     supported_versions = E.supportedVersions()
     for v in prefer_local('supported_versions'):
         supported_versions.append(E.li(str(v)))
@@ -133,7 +131,7 @@ def get_updates():
     reverse = prefer_local('descending_updates', True)
     for version, features in sorted(version_features().items(), reverse=reverse):
         update_scope = defaultdict(str, {'update_version': version.replace(r'.', r'_'), **mod_yaml, **global_yaml})
-        content = get_with_features(format_="{features}", is_xml=True, features=features)
+        content = get_with_features('update', features=features)
         element = E("HugsLib.UpdateFeatureDef",
                     {'ParentName': "UpdateFeatureBase"},
                     E.defName(
