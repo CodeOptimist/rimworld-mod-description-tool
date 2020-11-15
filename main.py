@@ -14,6 +14,16 @@ global_yaml = {}
 mod_yaml = {}
 
 
+class Join(yaml.YAMLObject):
+    yaml_tag = '!join'
+    yaml_loader = yaml.SafeLoader
+
+    @classmethod
+    def from_yaml(cls, loader, node):
+        seq = loader.construct_sequence(node)
+        return seq[0].join(str(s) for s in seq[1:])
+
+
 def main():
     global mod_yaml
     for yaml_path in sys.argv[1:]:
