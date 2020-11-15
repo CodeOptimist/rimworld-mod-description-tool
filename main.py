@@ -100,6 +100,10 @@ def get_with_features(format_name, features=None, feature_filter=lambda x: x):
 
     lines = []
     for feature in filter(feature_filter, features):
+        if f'{format_name}_raw' in feature:
+            lines.append(feature[f'{format_name}_raw'])
+            continue
+
         feature_lines = []
         feature_scope = defaultdict(str, {**{'feature_' + k: v for k, v in feature.items()}, **mod_yaml, **global_yaml})
         for line in feature_format.split("\n"):
