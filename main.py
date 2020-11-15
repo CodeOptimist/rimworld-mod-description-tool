@@ -93,7 +93,7 @@ def get_with_features(format_name, features=None, feature_filter=lambda x: x):
         features = mod_yaml['features']
 
     default_feature_formats = {
-        'steam': "[b]{feature_title}[/b]\n[i]{feature_steam}[/i]\n{feature_desc}",
+        'steam': "[u]{feature_title}[/u]\n[i]{feature_steam}[/i]\n{feature_desc}",
         'about': "<color=white><b>{feature_title}</b></color>\n{feature_desc}",
         'update': "<color=white><b>{feature_title}</b></color>\n{feature_desc}",
     }
