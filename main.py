@@ -54,11 +54,22 @@ def main():
         if updates.getchildren():
             write_xml(dir_name, [
                 prefer_local('updates_path', ""),
+                r'1.2\News\UpdateFeatures.xml',
+                r'v1.2\News\UpdateFeatures.xml',
+                r'1.1\News\UpdateFeatures.xml',
+                r'v1.1\News\UpdateFeatures.xml',
+                r'News\UpdateFeatures.xml',
                 r'Defs\UpdateFeatures.xml',
                 r'Defs\UpdateFeatureDefs\UpdateFeatures.xml',
             ], updates)
         if settings.getchildren():
-            write_xml(dir_name, [prefer_local('settings_path', ""), r'Languages\English\Keyed\Settings.xml'], settings)
+            write_xml(dir_name, [prefer_local('settings_path', ""),
+                                 r'1.2\Languages\English\Keyed\Settings.xml',
+                                 r'v1.2\Languages\English\Keyed\Settings.xml',
+                                 r'1.1\Languages\English\Keyed\Settings.xml',
+                                 r'v1.1\Languages\English\Keyed\Settings.xml',
+                                 r'Languages\English\Keyed\Settings.xml',
+                                 ], settings)
 
         ahk = Script()
         ahk.set('clipboard', markup)
@@ -116,13 +127,39 @@ def get_steam_markup():
 def get_about():
     description = get_with_features('about', feature_filter=lambda x: x.get('title'))
     supported_versions = E.supportedVersions()
-    for v in prefer_local('supported_versions'):
-        supported_versions.append(E.li(str(v)))
+    for version in prefer_local('supportedVersions'):
+        supported_versions.append(E.li(str(version)))
+
+    mod_dependencies = E.modDependencies()
+    for dependency in prefer_local('modDependencies'):
+        li = E.li()
+        for k, v in dependency.items():
+            # noinspection PyArgumentList
+            li.append(E(k, v))
+        mod_dependencies.append(li)
+
+    incompatible_with = E.incompatibleWith()
+    for package in prefer_local('incompatibleWith', ""):
+        incompatible_with.append(E.li(str(package)))
+
+    load_before = E.loadBefore()
+    for package in prefer_local('loadBefore', ""):
+        load_before.append(E.li(str(package)))
+
+    load_after = E.loadAfter()
+    for package in prefer_local('loadAfter', ""):
+        load_after.append(E.li(str(package)))
+
     result = E.ModMetaData(
         E.name(mod_yaml['name']),
+        E.packageId(mod_yaml['packageId']),
         E.author(prefer_local('author')),
         E.url(prefer_local('url', "")),
         supported_versions,
+        mod_dependencies,
+        incompatible_with,
+        load_before,
+        load_after,
         E.description(etree.CDATA(description)),
     )
     return result
@@ -132,9 +169,9 @@ def get_updates():
     # noinspection PyArgumentList
     result = E.Defs(
         E("HugsLib.UpdateFeatureDef",
-          {'Abstract': "true", 'Name': "UpdateFeatureBase"},
+          {'Abstract': "true", 'Name': "{packageId}_UpdateFeatureBase".format_map(mod_yaml)},
           E.modNameReadable(mod_yaml['name']),
-          E.modIdentifier(mod_yaml['identifier']),
+          E.modIdentifier(mod_yaml['packageId']),
           E.linkUrl(prefer_local('url', "")),
           )
     )
@@ -144,15 +181,15 @@ def get_updates():
         _version_features = {v: [f for f in mod_yaml['features'] if f.get('at') == v] for v in versions}
         return _version_features
 
-    reverse = prefer_local('descending_updates', True)
-    for version, features in sorted(version_features().items(), reverse=reverse):
-        update_scope = defaultdict(str, {'update_version': version.replace(r'.', r'_'), **mod_yaml, **global_yaml})
+    # ascending sort is mandatory with HugsLib on 1.1 or LastSeenNews.xml will update wrong
+    for version, features in sorted(version_features().items()):
+        update_scope = defaultdict(str, {'update_version': version, **mod_yaml, **global_yaml})
         content = get_with_features('update', features=features)
         # noinspection PyArgumentList
         element = E("HugsLib.UpdateFeatureDef",
-                    {'ParentName': "UpdateFeatureBase"},
+                    {'ParentName': "{packageId}_UpdateFeatureBase".format_map(mod_yaml)},
                     E.defName(
-                        prefer_local('update_defname_format', "{identifier}_{update_version}").format_map(update_scope).format_map(update_scope)),
+                        prefer_local('update_defname_format', "{packageId}_{update_version}").format_map(update_scope).format_map(update_scope)),
                     E.assemblyVersion(version),
                     E.content(etree.CDATA(content)),
                     )
@@ -176,12 +213,12 @@ def get_settings():
     for name, setting in gathered.items():
         setting_scope = defaultdict(str, {'setting_name': name, **mod_yaml, **global_yaml})
         # noinspection PyArgumentList
-        title = E(prefer_local('setting_title_key_format', "{identifier}_{setting_name}_SettingTitle").format_map(setting_scope).format_map(setting_scope),
+        title = E(prefer_local('setting_title_key_format', "{packageId}_SettingTitle_{setting_name}").format_map(setting_scope).format_map(setting_scope),
                   etree.CDATA(markup_to_xml(re.sub(r'\.$', r'', setting['title']))))
         result.append(title)
         # noinspection PyArgumentList
         desc = E(
-            prefer_local('setting_desc_key_format', "{identifier}_{setting_name}_SettingDesc").format_map(setting_scope).format_map(setting_scope),
+            prefer_local('setting_desc_key_format', "{packageId}_SettingDesc_{setting_name}").format_map(setting_scope).format_map(setting_scope),
             etree.CDATA(markup_to_xml(setting['desc'])))
         result.append(desc)
 
