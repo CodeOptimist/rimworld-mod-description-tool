@@ -1,9 +1,9 @@
 # Copyright (C) 2019  Christopher S. Galpin.  See /NOTICE.
 import os
-import pathlib
 import re
 import sys
 from collections import defaultdict
+from pathlib import Path
 
 import yaml
 from ahkunwrapped import Script
@@ -26,9 +26,10 @@ class Join(yaml.YAMLObject):
 
 def main():
     global mod_yaml
-    for yaml_path in sys.argv[1:]:
-        if not os.path.isabs(yaml_path):
-            yaml_path = os.path.join(os.getcwd(), yaml_path)
+    for _yaml_path in sys.argv[1:]:
+        yaml_path = Path(_yaml_path).resolve()
+        if yaml_path.suffix != '.yaml':
+            exit(1)
         if os.path.isdir(yaml_path):
             yaml_path = os.path.join(yaml_path, r'public.yaml')
         with open(yaml_path, encoding='utf-8') as f:
@@ -234,7 +235,7 @@ def write_xml(base_path, rel_paths, root):
     exist_paths = (path for path in paths if os.path.exists(path))
     path = next(exist_paths, None) or paths[0]
 
-    pathlib.Path(os.path.dirname(path)).mkdir(parents=True, exist_ok=True)
+    Path(os.path.dirname(path)).mkdir(parents=True, exist_ok=True)
     with open(path, mode='wb') as f:
         f.write(etree.tostring(root, xml_declaration=True, encoding='UTF-8', pretty_print=True))
 
