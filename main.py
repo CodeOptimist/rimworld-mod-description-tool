@@ -84,7 +84,7 @@ def prefer_local(key, default=None):
         return default
     is_required = default is None
     if is_required:
-        return mod_yaml.get(key, global_yaml['global_' + key])
+        return mod_yaml.get(key) or global_yaml['global_' + key]
     return mod_yaml.get(key, global_yaml.get('global_' + key, default))
 
 
@@ -203,16 +203,14 @@ def get_updates():
 
 
 def get_settings():
-    def val(a, b):
-        # so we can give a setting key an explicit blank value instead of inheriting the feature value
-        return "" if a == "" else (a or b)
-
     gathered = defaultdict(lambda: defaultdict(str))
     for feature in mod_yaml['features']:
+        feature_scope = defaultdict(str, {**{'feature_' + k: v for k, v in feature.items()}, **mod_yaml, **global_yaml})
         for setting in feature.get('settings', []):
             name = setting['name']
-            gathered[name]['title'] += (val(setting.get('title'), feature['title']))
-            gathered[name]['desc'] += (val(setting.get('desc'), feature.get('desc', "")))
+
+            gathered[name]['title'] = feature['title'] if not setting.get('title') else setting.get('title').format_map(feature_scope).format_map(feature_scope)
+            gathered[name]['desc'] = feature.get('desc', "") if not setting.get('desc') else setting.get('desc').format_map(feature_scope).format_map(feature_scope)
 
     result = E.LanguageData()
     for name, setting in gathered.items():
