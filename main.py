@@ -241,9 +241,12 @@ def write_xml(base_path, rel_paths, root):
 def markup_to_xml(text):
     result = text
     url_format = prefer_local('xml_url_format', r'<color=grey><b>{text}</b></color>').format(url=r'\1', text=r'\2')
-    result = re.sub(r'\[url=(.*?)](.*?)\[/url]', url_format, result, flags=re.DOTALL)
+    result = re.sub(r'\[url=(.*?)](.*?)\[/url]', url_format, result, flags=re.DOTALL | re.IGNORECASE)
     u_format = prefer_local('xml_u_format', r'<color=grey>{text}</color>').format(text=r'\1')
-    result = re.sub(r'\[u](.*?)\[/u]', u_format, result, flags=re.DOTALL)
+    result = re.sub(r'\[u](.*?)\[/u]', u_format, result, flags=re.DOTALL | re.IGNORECASE)
+
+    result = re.sub(r'\n\[img](.*?)\[/img]\n', '\n', result, flags=re.DOTALL | re.IGNORECASE)
+    result = re.sub(r'\[img](.*?)\[/img]', '', result, flags=re.DOTALL | re.IGNORECASE)
 
     count = -1
     while count != 0:
