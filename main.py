@@ -1,7 +1,12 @@
 # Copyright (C) 2019  Christopher S. Galpin.  See /NOTICE.
-import os, re, yaml, pathlib, sys
-# from autohotkey import Script
+import os
+import pathlib
+import re
+import sys
 from collections import defaultdict
+
+import yaml
+from ahkunwrapped import Script
 from lxml import etree
 from lxml.builder import E
 
@@ -45,8 +50,8 @@ def main():
         if settings.getchildren():
             write_xml(dir_name, [prefer_local('settings_path', ""), r'Languages\English\Keyed\Settings.xml'], settings)
 
-        # ahk = Script()
-        # ahk.set('clipboard', markup)
+        ahk = Script()
+        ahk.set('clipboard', markup)
         print('-' * 100)
         print(markup)
         print('-' * 100)
@@ -114,6 +119,7 @@ def get_about():
 
 
 def get_updates():
+    # noinspection PyArgumentList
     result = E.Defs(
         E("HugsLib.UpdateFeatureDef",
           {'Abstract': "true", 'Name': "UpdateFeatureBase"},
@@ -132,6 +138,7 @@ def get_updates():
     for version, features in sorted(version_features().items(), reverse=reverse):
         update_scope = defaultdict(str, {'update_version': version.replace(r'.', r'_'), **mod_yaml, **global_yaml})
         content = get_with_features('update', features=features)
+        # noinspection PyArgumentList
         element = E("HugsLib.UpdateFeatureDef",
                     {'ParentName': "UpdateFeatureBase"},
                     E.defName(
@@ -158,9 +165,11 @@ def get_settings():
     result = E.LanguageData()
     for name, setting in gathered.items():
         setting_scope = defaultdict(str, {'setting_name': name, **mod_yaml, **global_yaml})
+        # noinspection PyArgumentList
         title = E(prefer_local('setting_title_key_format', "{identifier}_{setting_name}_SettingTitle").format_map(setting_scope).format_map(setting_scope),
                   etree.CDATA(markup_to_xml(re.sub(r'\.$', r'', setting['title']))))
         result.append(title)
+        # noinspection PyArgumentList
         desc = E(
             prefer_local('setting_desc_key_format', "{identifier}_{setting_name}_SettingDesc").format_map(setting_scope).format_map(setting_scope),
             etree.CDATA(markup_to_xml(setting['desc'])))
