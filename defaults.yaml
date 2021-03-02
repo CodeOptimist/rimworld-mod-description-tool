@@ -1,0 +1,91 @@
+---
+## YAML Documentation
+# |, |-, |+ block chomping indicators https://yaml.org/spec/1.2/spec.html#id2794534 (|- to strip final linebreaks)
+# ~ null type https://yaml.org/type/null.html (~ is same as blank)
+# "" vs '' https://yaml.org/spec/1.2/spec.html#id2787109 ("" will interpret \n as a newline)
+# yaml multiline interactive summary http://yaml-multiline.info/
+
+## MAIN
+# {local_dir} is the (true) folder of the .yaml file given to the program
+# {working_dir} is set by the user (generally where the program is executed from)
+out_dir: '{local_dir}\_ModDescriptionTool' # for safety so as not to overwrite files unexpectedly
+
+features: [ ]
+
+
+## FORMATS
+steam_format: |- # l.features
+  {features}
+steam_feature_format: |
+  [u]{title}[/u]
+  {steam}
+  {desc}
+
+# convenient way of setting {ModMetaData.description} below
+about_format: |- # l.features
+  {features}
+about_feature_format: |
+  <color=white><b>{title}</b></color>
+  {desc}
+
+# convenient way of setting {UpdateFeatureDef.content} below
+update_format: |- # l.version, l.updates
+  {updates}
+update_feature_format: |
+  <color=white><b>{title}</b></color>
+  {desc}
+
+# see end of file for settings since they use dynamic keys
+
+
+# translate unsupported steam markup to xml
+xml_url_format: '<color=grey><b>{text}</b></color>' # l.url, l.text
+xml_u_format: '<color=grey>{text}</color>' # l.text
+
+
+## ABOUT
+about_path: '{out_dir}\About\About.xml'
+ModMetaData:
+  name: ''
+  packageId: ''
+  author: ''
+  url: ~
+  supportedVersions:
+    - 1.2
+  modDependencies: [ ]
+  incompatibleWith: [ ]
+  loadBefore: [ ]
+  loadAfter: [ ]
+  description: !steam2xml "{about_format}\n" # \n avoids text cut-off in-game
+
+
+## UPDATES
+updates_path: '{out_dir}\1.2\News\UpdateFeatures.xml'
+UpdateFeatureDefBase:
+  _Abstract: true
+  _Name: &update_base_name '{ModMetaData.packageId}_UpdateFeatureBase'
+  # https://github.com/UnlimitedHugs/RimworldHugsLib/blob/477aa179dbedf5d02ce8ede361a42c45af24b746/Source/News/UpdateFeatureDef.cs#L23
+  # doesn't hurt to include this
+  modNameReadable: '{ModMetaData.name}'
+  modIdentifier: '{ModMetaData.packageId}'
+  linkUrl: '{ModMetaData.url}'
+
+UpdateFeatureDef:
+  _ParentName: *update_base_name
+  # https://github.com/UnlimitedHugs/RimworldHugsLib/blob/477aa179dbedf5d02ce8ede361a42c45af24b746/Source/News/UpdateFeatureDef.cs#L106
+  # doesn't seem optional in reality; get 'Adding duplicate HugsLib.UpdateFeatureDef name: UnnamedDef'
+  defName: '{ModMetaData.packageId}_{version}'
+  assemblyVersion: '{version}'
+  content: !steam2xml "{update_format}\n" # \n avoids text cut-off in-game
+  titleOverride: ~
+  linkUrl: ~
+  # https://github.com/UnlimitedHugs/RimworldHugsLib/blob/477aa179dbedf5d02ce8ede361a42c45af24b746/Source/News/UpdateFeatureDef.cs#L64
+  #trimWhitespace: true # default
+
+
+## SETTINGS
+settings_path: '{out_dir}\1.2\Languages\English\Keyed\Settings.xml'
+setting_prefix: '{ModMetaData.packageId}'
+SettingLanguageData:
+  '{setting_prefix}_SettingTitle_{name}': !steam2xml '{title}'
+  '{setting_prefix}_SettingDesc_{name}': !steam2xml '{desc}'
