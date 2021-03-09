@@ -34,11 +34,9 @@ def main() -> None:
         exit(1)
     g = codeoptimist.yaml.load(yaml_path)
 
-    local_dir = yaml_path.parent
-    g.setdefault('local_dir', local_dir)
+    assert g['out_dir'] is not None
+    g.setdefault('local_dir', yaml_path.parent)
     g.setdefault('working_dir', os.getcwd())
-    if g.out_dir is None:
-        g.out_dir = local_dir
 
     steam = get_steam()
     about = get_about()
