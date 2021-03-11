@@ -1,0 +1,17 @@
+#parent=defaults.yaml
+---
+#out_dir: '{local_dir}'
+
+ModMetaData: !merge
+  <: !parent ModMetaData
+  author: Jane Doe
+
+steam_format: |-
+  {intro}
+  
+  {features}
+about_format: |-
+  {intro}
+  
+  {features}
+  Thanks for installing!

@@ -1,0 +1,57 @@
+#parent=example_global.yaml
+---
+ModMetaData: !merge
+  <: !parent ModMetaData
+  name: Super Swords
+  packageId: modder.superswords
+  url: https://example.com/rimworld-super-swords
+  supportedVersions:
+    - 1.1
+  modDependencies:
+    - packageId: brrainz.harmony
+      displayName: Harmony
+      steamWorkshopUrl: steam://url/CommunityFilePage/2009463077
+      downloadUrl: https://github.com/pardeike/HarmonyRimWorld/releases/latest
+
+# our own for {steam_format} and {about_format} (example_global.yaml)
+intro: Super slashin'! Git 'em good!
+
+# presented in order for Steam & About
+features:
+  # for {steam_feature_format} and {about_feature_format} (defaults.yaml)
+  - title: Super gladius.
+    at: 1.0.0
+    desc: &gladius |-
+      A super gladius: 2x vanilla damage.
+    steam: |-
+      Slashy slashy!
+  
+  - title: Super longsword.
+    at: 1.2.0 # (special) to include with updates inheriting feature {title}, {desc}, etc.
+    desc: &longsword |-
+      A super longsword: 1.5x vanilla damage.
+    settings: # (special) to include with settings inheriting feature {title}, {desc}, etc.
+      - name: useLongsword
+        title: Enable longsword
+  
+  - title: Spawn map with random super sword.
+    desc:
+    at: 1.1.0
+    swords: !join [ "\n", [ *gladius, *longsword ] ]
+    settings:
+      - name: spawnWith
+        desc: |-
+          Spawn map with one of these swords:
+          {swords}
+
+updates:
+  - at: 1.1.0
+    desc: |-
+      • Fixed bug with super gladius.
+  - at: 1.2.1
+    desc: |-
+      • Fixed bug with super longsword.
+
+settings:
+  - name: enabled
+    title: Enable mod

@@ -2,3 +2,6 @@
 venv/
 *.yaml
 !defaults.yaml
+!example_global.yaml
+!example_mod.yaml
+!example_beta.yaml

@@ -1,0 +1,66 @@
+#parent=example_mod.yaml
+---
+# so we can reference these within format strings
+stable:
+  ModMetaData: !parent ModMetaData
+  intro: !parent intro
+beta:
+  modDependencies: &beta_modDependencies
+    - packageId: UnlimitedHugs.HugsLib
+      displayName: HugsLib
+      steamWorkshopUrl: steam://url/CommunityFilePage/818773962
+      downloadUrl: https://github.com/UnlimitedHugs/RimworldHugsLib/releases/latest
+
+ModMetaData: !merge
+  <: !parent ModMetaData
+  name: '{stable.ModMetaData.name} Beta'
+  packageId: '{stable.ModMetaData.packageId}.beta'
+  supportedVersions: !insert &supportedVersions
+    - !parent ModMetaData.supportedVersions
+    - 1.2
+  # by using !concat instead of !insert we can reference beta.modDependencies elsewhere
+  modDependencies: !concat
+    - !parent ModMetaData.modDependencies
+    - *beta_modDependencies
+
+
+features: !insert &features
+  # positions will determine the placement of these elements in the final result
+  #  tilde ~ will leave in-place if found, otherwise append to end (same as omission)
+  - [ !parent features, '{title}', [ ~, 2 ] ]
+  - title: Super gladius.
+    at: 1.0.0
+    desc: |-
+      A super gladius: 3x vanilla damage.
+  
+  - title: Super spear.
+    at: 1.3.0
+    desc: |-
+      - A super spear: 2x vanilla damage.
+  
+  - title: Less important addition.
+    at: 1.3.0
+    desc: Minor awesome.
+
+
+published_file_id: 1234567890
+preview_from_path: 'beta.png'
+setting_prefix: '{stable.ModMetaData.packageId}'
+
+feature_settings: !join [ ", ", *features, '{l.settings[0].name?}' ]
+float_versions: !join [ ", ", *supportedVersions, '{l:.3f}' ]
+dependency_names: !join [ ", ", *beta_modDependencies, '{displayName}' ]
+
+intro: |-
+  Thanks for trying the beta!
+  
+  {stable.intro}
+  
+  
+  Debugging:
+  feature settings: {feature_settings}
+  float versions: {float_versions}
+  beta dependency names: {dependency_names}
+  hex published file id: {published_file_id:x}
+  first dependency: {beta.modDependencies[0]!e}
+  features: {g.features!e}
