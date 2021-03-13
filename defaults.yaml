@@ -16,6 +16,8 @@ published_file_id_path: '{out_dir}\About\PublishedFileId.txt'
 published_file_id: ~ # when provided, write to PublishedFileId.txt
 
 features: [ ]
+updates: [ ] # standalone updates
+settings: [ ] # standalone settings
 
 
 ## FORMATS

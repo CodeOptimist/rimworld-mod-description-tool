@@ -137,8 +137,12 @@ def get_updates() -> _Element:
     root = E.Defs(update_parent)
 
     def version_updates() -> dict:
-        versions = set(at for u in g.features if (at := u.get('at')))
-        result = {v: [u for u in g.features if u.get('at') == v] for v in versions}
+        versions = set(at for u in g.features if (at := u.get('at'))) | set(u['at'] for u in g.updates)
+        result = {}
+        for version in versions:
+            feature_updates = [u for u in g.features if u.get('at') == version]
+            standalone_updates = [u for u in g.updates if u['at'] == version]
+            result[version] = feature_updates + standalone_updates
         return result
 
     # ascending sort is mandatory with HugsLib on 1.1 or LastSeenNews.xml will update wrong
@@ -154,6 +158,7 @@ def get_updates() -> _Element:
 def get_settings() -> _Element:
     # name key must be on the setting itself
     settings = [{**feature, 'name': None, **setting} for feature in g.features for setting in feature.get('settings', [])]
+    settings += g.settings
 
     root = E.LanguageData()
     for setting in settings:
