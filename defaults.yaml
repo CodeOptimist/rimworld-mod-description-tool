@@ -10,6 +10,11 @@
 # {working_dir} is set by the user (generally where the program is executed from)
 out_dir: '{local_dir}\_ModDescriptionTool' # for safety so as not to overwrite files unexpectedly
 
+preview_path: '{out_dir}\About\Preview.png'
+preview_from_path: ~ # when provided, copy an image to preview_path
+published_file_id_path: '{out_dir}\About\PublishedFileId.txt'
+published_file_id: ~ # when provided, write to PublishedFileId.txt
+
 features: [ ]
 
 

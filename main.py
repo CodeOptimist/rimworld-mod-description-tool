@@ -3,6 +3,7 @@ import os
 import re
 import sys
 from pathlib import Path
+from shutil import copy
 from typing import Any
 from typing import Optional
 
@@ -43,6 +44,18 @@ def main() -> None:
     about = get_about()
     updates = get_updates()
     settings = get_settings()
+
+    if g.preview_from_path:
+        preview_from_path = Path(f.format(g.preview_from_path))
+        preview_path = Path(f.format(g.preview_path))
+        preview_path.parent.mkdir(parents=True, exist_ok=True)
+        copy(preview_from_path, preview_path)
+
+    if g.published_file_id:
+        published_file_id_path = Path(f.format(g.published_file_id_path))
+        published_file_id_path.parent.mkdir(parents=True, exist_ok=True)
+        with published_file_id_path.open(mode='w', encoding='utf-8') as f_published:
+            f_published.write(str(g.published_file_id))
 
     def write_xml(root: _Element, path_str: str) -> None:
         path = Path(path_str)
