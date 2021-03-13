@@ -16,24 +16,26 @@ features: [ ]
 ## FORMATS
 steam_format: |- # l.features
   {features}
-steam_feature_format: |
-  [u]{title}[/u]
-  {steam}
-  {desc}
+# setting {steam} is optional '?' and when non-blank is replaced '=' with itself in italics with a trailing newline
+# setting {desc} is required and when non-blank appended to '+' with a trailing newline
+steam_feature_format: "[u]{title}[/u]\n\
+ {steam?=[i]__value__[/i]\n}\
+ {desc+\n}\
+ \n"
 
 # convenient way of setting {ModMetaData.description} below
 about_format: |- # l.features
   {features}
-about_feature_format: |
-  <color=white><b>{title}</b></color>
-  {desc}
+about_feature_format: "<color=white><b>{title}</b></color>\n\
+  {desc+\n}\
+  \n"
 
 # convenient way of setting {UpdateFeatureDef.content} below
 update_format: |- # l.version, l.updates
   {updates}
-update_feature_format: |
-  <color=white><b>{title}</b></color>
-  {desc}
+update_feature_format: "{title?=<color=white><b>__value__</b></color>\n}\
+  {desc+\n}\
+  \n"
 
 # see end of file for settings since they use dynamic keys
 
@@ -88,4 +90,4 @@ settings_path: '{out_dir}\1.2\Languages\English\Keyed\Settings.xml'
 setting_prefix: '{ModMetaData.packageId}'
 SettingLanguageData:
   '{setting_prefix}_SettingTitle_{name}': !steam2xml '{title}'
-  '{setting_prefix}_SettingDesc_{name}': !steam2xml '{desc}'
+  '{setting_prefix}_SettingDesc_{name}': !steam2xml '{desc?}'
