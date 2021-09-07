@@ -6,12 +6,9 @@ ModMetaData: !merge
   <: !parent ModMetaData
   author: Jane Doe
 
-steam_format: |-
+description: |-
   {intro}
   
-  {features}
-about_format: |-
-  {intro}
-  
-  {features}
-  Thanks for installing!
+  {features}{is_about?=
+
+  Thanks for installing&excl;}

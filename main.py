@@ -24,6 +24,7 @@ class Steam2Xml(str):
 
 
 g: AttrDict
+# marks a scalar by wrapping it with a constructor we can check later
 add_constructor('!steam2xml', lambda l, n: Steam2Xml(l.construct_scalar(n)), Loader=SafeLoader)
 
 
@@ -38,20 +39,8 @@ def main() -> None:
     g.setdefault('local_dir', yaml_path.parent)
     g.setdefault('working_dir', os.getcwd())
 
-    def get_steam() -> str:
-        formatted_features = ''.join(f.format(g.steam_feature_format, l=feature) for feature in g.features).strip()
-        result = f.format(g.steam_format, l={'features': formatted_features})
-        return result
-
-    steam = get_steam()
-
-    def get_about() -> _Element:
-        root = E.ModMetaData()
-        formatted_features = ''.join(f.format(g.about_feature_format, l=feature) for feature in g.features).strip()
-        populate_xml(root, g.ModMetaData, locals={'features': formatted_features})
-        return root
-
-    about_xml = get_about()
+    # do this first to hit errors early
+    steam = f.format(g.description, l={'is_steam': True})
 
     # noinspection PyShadowingBuiltins
     def populate_xml(xml_element: _Element, value: Any, *, locals: Optional[dict] = None) -> None:
@@ -96,26 +85,25 @@ def main() -> None:
             assert value is not None, f'{xml_element}'
             xml_element.text = f.format(str(value), l=locals)
 
+    about_xml = E.ModMetaData()
+    populate_xml(about_xml, g.ModMetaData, locals={'is_about': True})
+
     def get_updates() -> _Element:
         update_parent = E('HugsLib.UpdateFeatureDef')
         populate_xml(update_parent, g.UpdateFeatureDefBase)
         root = E.Defs(update_parent)
 
-        def version_updates() -> dict:
-            versions = set(at for u in g.features if (at := u.get('at'))) | set(u['at'] for u in g.updates)
-            result = {}
-            for version_ in versions:
-                feature_updates = [u for u in g.features if u.get('at') == version_]
-                standalone_updates = [u for u in g.updates if u['at'] == version_]
-                result[version_] = feature_updates + standalone_updates
-            return result
+        version_updates = {}
+        versions = set(u['at'] for u in g.updates)
+        for version in versions:
+            version_updates[version] = [u for u in g.updates if u['at'] == version]
 
         # ascending sort is mandatory with HugsLib on 1.1 or LastSeenNews.xml will update wrong
-        for version, updates in sorted(version_updates().items()):
+        for version, updates in sorted(version_updates.items()):
             update_xml = E('HugsLib.UpdateFeatureDef')
-            # end the xml element with only one newline
-            formatted_updates = ''.join(f.format(g.update_feature_format, l=update) for update in updates).strip()
-            populate_xml(update_xml, g.UpdateFeatureDef, locals={'version': version, 'updates': formatted_updates})
+            content = '\n'.join(f.format(g.update_format, l=update).strip() + '\n' for update in updates)
+            # strip() to end the xml element with only one newline
+            populate_xml(update_xml, g.UpdateFeatureDef, locals={'version': version, 'content': content.strip()})
             root.append(update_xml)
         return root
 
@@ -140,11 +128,7 @@ def main() -> None:
         if root is None:
             root = E.LanguageData()
 
-        # name key must be on the setting itself
-        settings = [{**feature, 'name': None, **setting} for feature in g.features for setting in feature.get('settings', [])]
-        settings += g.settings
-
-        for setting in settings:
+        for setting in g.settings:
             setting: dict
             assert setting['name'], setting
             assert 'title' in setting, setting  # permit ''

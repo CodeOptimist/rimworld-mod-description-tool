@@ -15,39 +15,13 @@ preview_from_path: ~ # when provided, copy an image to preview_path
 published_file_id_path: '{out_dir}\About\PublishedFileId.txt'
 published_file_id: ~ # when provided, write to PublishedFileId.txt
 
-features: [ ]
-updates: [ ] # standalone updates
-settings: [ ] # standalone settings
+updates: [ ]
+settings: [ ]
 
-
-## FORMATS
-steam_format: |- # l.features
-  {features}
-# setting {steam} is optional '?' and when non-blank is replaced '=' with itself in italics with a trailing newline
-# setting {desc} is required and when non-blank appended to '+' with a trailing newline
-steam_feature_format: "[u]{title}[/u]\n\
- {steam?=[i]__value__[/i]\n}\
- {desc+\n}\
- \n"
-
-# convenient way of setting {ModMetaData.description} below
-about_format: |- # l.features
-  {features}
-about_feature_format: "<color=white><b>{title}</b></color>\n\
-  {desc+\n}\
+update_format: "{desc+\n}\
   \n"
 
-# convenient way of setting {UpdateFeatureDef.content} below
-update_format: |- # l.version, l.updates
-  {updates}
-update_feature_format: "{title?=<color=white><b>__value__</b></color>\n}\
-  {desc+\n}\
-  \n"
-
-# see end of file for settings since they use dynamic keys
-
-
-# translate unsupported steam markup to xml
+# translate steam markup to xml
 xml_url_format: '<color=grey><b>{text}</b></color>' # l.url, l.text
 xml_u_format: '<color=grey>{text}</color>' # l.text
 
@@ -65,11 +39,11 @@ ModMetaData:
   incompatibleWith: [ ]
   loadBefore: [ ]
   loadAfter: [ ]
-  description: !steam2xml "{about_format}\n" # \n avoids text cut-off in-game
+  description: !steam2xml "{description}\n" # \n avoids text cut-off in-game
 
 
 ## UPDATES
-updates_path: '{out_dir}\1.2\News\UpdateFeatures.xml'
+updates_path: '{out_dir}\1.3\News\UpdateFeatures.xml'
 UpdateFeatureDefBase:
   _Abstract: true
   _Name: &update_base_name '{ModMetaData.packageId}_UpdateFeatureBase'
@@ -85,7 +59,7 @@ UpdateFeatureDef:
   # doesn't seem optional in reality; get 'Adding duplicate HugsLib.UpdateFeatureDef name: UnnamedDef'
   defName: '{ModMetaData.packageId}_{version}'
   assemblyVersion: '{version}'
-  content: !steam2xml "{update_format}\n" # \n avoids text cut-off in-game
+  content: !steam2xml "{content}\n" # \n avoids text cut-off in-game
   titleOverride: ~
   linkUrl: ~
   # https://github.com/UnlimitedHugs/RimworldHugsLib/blob/477aa179dbedf5d02ce8ede361a42c45af24b746/Source/News/UpdateFeatureDef.cs#L64

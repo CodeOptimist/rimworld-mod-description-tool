@@ -11,45 +11,64 @@ ModMetaData: !merge
       steamWorkshopUrl: steam://url/CommunityFilePage/2009463077
       downloadUrl: https://github.com/pardeike/HarmonyRimWorld/releases/latest
 
-# our own for {steam_format} and {about_format} (example_global.yaml)
+
 intro: Super slashin'! Git 'em good!
 
-# presented in order for Steam & About
-features:
-  # for {steam_feature_format} and {about_feature_format} (defaults.yaml)
-  - title: Super gladius.
-    at: 1.0.0
-    desc: &gladius |-
-      A super gladius: 2x vanilla damage.
-    steam: |-
-      Slashy slashy!
-  
-  - title: Super longsword.
-    at: 1.2.0 # (special) to include with updates inheriting feature {title}, {desc}, etc.
-    desc: &longsword |-
-      A super longsword: 1.5x vanilla damage.
-    settings: # (special) to include with settings inheriting feature {title}, {desc}, etc.
-      - name: useLongsword
-        title: Enable longsword
-  
-  - title: Spawn map with random super sword.
-    desc:
-    at: 1.1.0
-    swords: !join [ "\n", [ *gladius, *longsword ] ]
-    settings:
-      - name: spawnWith
-        desc: |-
-          Spawn map with one of these swords:
-          {swords}
+# mappings are easy to override in a child file
+longsword:
+  title: &longsword_title '[u]Super longsword.[/u]'
+  desc: &longsword_desc 'A super longsword: 1.5x vanilla damage.'
+_: &v1_2_0 !join [ "\n", [ *longsword_title, *longsword_desc ] ]
+
+features: !join
+  - "\n"
+  - - &v1_0_0 !join
+      - "\n"
+      - - |-
+          [u]Super gladius.[/u]
+        - &gladius_desc |-
+          A super gladius: 2x vanilla damage.
+    - |-
+      {is_steam?=Slashy slashy&excl;
+      }
+      {longsword.title}
+      {longsword.desc}
+    -
+    - &v1_1_0 |-
+      [u]Spawn map with random super sword.[/u]
+      It's a neat feature!
+
 
 updates:
+  - at: 1.0.0
+    desc: *v1_0_0
+
   - at: 1.1.0
-    desc: |-
-      • Fixed bug with super gladius.
+    desc: !join
+      - "\n"
+      - - *v1_1_0
+        - |-
+
+          • Fixed bug with super gladius.
+
+  - at: 1.2.0
+    desc: *v1_2_0
+
   - at: 1.2.1
-    desc: |-
-      • Fixed bug with super longsword.
+    desc: '• Fixed bug with super longsword.'
+
 
 settings:
   - name: enabled
     title: Enable mod
+
+  - name: useLongsword
+    title: Enable longsword
+    desc: '{longsword.desc}'
+
+  - name: spawnWith
+    title: *v1_1_0
+    swords: !join [ "\n", [ *gladius_desc, '{longsword.desc}' ] ]
+    desc: |-
+      Spawn map with one of these swords:
+      {swords}
