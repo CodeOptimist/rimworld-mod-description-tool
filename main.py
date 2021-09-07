@@ -51,8 +51,9 @@ def main() -> None:
         populate_xml(root, g.ModMetaData, locals={'features': formatted_features})
         return root
 
-    about = get_about()
+    about_xml = get_about()
 
+    # noinspection PyShadowingBuiltins
     def populate_xml(xml_element: _Element, value: Any, *, locals: Optional[dict] = None) -> None:
         if isinstance(dict_ := value, dict):
             for k, v in dict_.items():
@@ -103,22 +104,22 @@ def main() -> None:
         def version_updates() -> dict:
             versions = set(at for u in g.features if (at := u.get('at'))) | set(u['at'] for u in g.updates)
             result = {}
-            for version in versions:
-                feature_updates = [u for u in g.features if u.get('at') == version]
-                standalone_updates = [u for u in g.updates if u['at'] == version]
-                result[version] = feature_updates + standalone_updates
+            for version_ in versions:
+                feature_updates = [u for u in g.features if u.get('at') == version_]
+                standalone_updates = [u for u in g.updates if u['at'] == version_]
+                result[version_] = feature_updates + standalone_updates
             return result
 
         # ascending sort is mandatory with HugsLib on 1.1 or LastSeenNews.xml will update wrong
         for version, updates in sorted(version_updates().items()):
-            update = E('HugsLib.UpdateFeatureDef')
+            update_xml = E('HugsLib.UpdateFeatureDef')
             # end the xml element with only one newline
             formatted_updates = ''.join(f.format(g.update_feature_format, l=update) for update in updates).strip()
-            populate_xml(update, g.UpdateFeatureDef, locals={'version': version, 'updates': formatted_updates})
-            root.append(update)
+            populate_xml(update_xml, g.UpdateFeatureDef, locals={'version': version, 'updates': formatted_updates})
+            root.append(update_xml)
         return root
 
-    updates = get_updates()
+    updates_xml = get_updates()
 
     def get_settings() -> _Element:
         # name key must be on the setting itself
@@ -138,7 +139,7 @@ def main() -> None:
                 root.append(setting_element)
         return root
 
-    settings = get_settings()
+    settings_xml = get_settings()
 
     if g.preview_from_path:
         preview_from_path = Path(f.format(g.preview_from_path))
@@ -158,11 +159,11 @@ def main() -> None:
         with path.open(mode='wb') as f_xml:
             f_xml.write(etree.tostring(root, xml_declaration=True, encoding='UTF-8', pretty_print=True))
 
-    write_xml(about, f.format(g.about_path))
-    if updates.getchildren():
-        write_xml(updates, f.format(g.updates_path))
-    if settings.getchildren():
-        write_xml(settings, f.format(g.settings_path))
+    write_xml(about_xml, f.format(g.about_path))
+    if updates_xml.getchildren():
+        write_xml(updates_xml, f.format(g.updates_path))
+    if settings_xml.getchildren():
+        write_xml(settings_xml, f.format(g.settings_path))
 
     pyperclip.copy(steam)
     print('-' * 100)
