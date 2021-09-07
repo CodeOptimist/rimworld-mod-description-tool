@@ -5,8 +5,6 @@ ModMetaData: !merge
   name: Super Swords
   packageId: modder.superswords
   url: https://example.com/rimworld-super-swords
-  supportedVersions:
-    - 1.1
   modDependencies:
     - packageId: brrainz.harmony
       displayName: Harmony

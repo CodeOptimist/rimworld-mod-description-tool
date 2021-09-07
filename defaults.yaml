@@ -60,7 +60,7 @@ ModMetaData:
   author: ''
   url: ~
   supportedVersions:
-    - 1.2
+    - 1.3
   modDependencies: [ ]
   incompatibleWith: [ ]
   loadBefore: [ ]
@@ -92,9 +92,16 @@ UpdateFeatureDef:
   #trimWhitespace: true # default
 
 
+## KEYS
+keys_path: '{out_dir}\1.3\Languages\English\Keyed\Keys.xml'
+key_prefix: '{ModMetaData.packageId}'
+KeyLanguageData:
+    '{key_prefix}_{name}': !steam2xml '{value}'
+
+
 ## SETTINGS
-settings_path: '{out_dir}\1.2\Languages\English\Keyed\Settings.xml'
-setting_prefix: '{ModMetaData.packageId}'
+settings_path: '{keys_path}'
+setting_prefix: '{key_prefix}'
 SettingLanguageData:
   '{setting_prefix}_SettingTitle_{name}': !steam2xml '{title}'
   '{setting_prefix}_SettingDesc_{name}': !steam2xml '{desc?}'

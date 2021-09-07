@@ -121,25 +121,42 @@ def main() -> None:
 
     updates_xml = get_updates()
 
-    def get_settings() -> _Element:
+    def get_keys() -> _Element:
+        root = E.LanguageData()
+        for key in g.get('keyed', []):
+            key: dict
+            assert key['name'], key
+            assert 'value' in key, key  # permit ''
+
+            xml_container = E('temp')
+            populate_xml(xml_container, g.KeyLanguageData, locals=key)
+            for key_element in xml_container:
+                root.append(key_element)
+        return root
+
+    keys_xml = get_keys()
+
+    def get_settings(root: _Element = None) -> _Element:
+        if root is None:
+            root = E.LanguageData()
+
         # name key must be on the setting itself
         settings = [{**feature, 'name': None, **setting} for feature in g.features for setting in feature.get('settings', [])]
         settings += g.settings
 
-        root = E.LanguageData()
         for setting in settings:
             setting: dict
             assert setting['name'], setting
-            assert 'title' in setting, setting
+            assert 'title' in setting, setting  # permit ''
 
-            setting['title'] = re.sub(r'\b\.$', '', setting['title'])
+            # setting['title'] = re.sub(r'\b\.$', '', setting['title'])
             xml_container = E('temp')
             populate_xml(xml_container, g.SettingLanguageData, locals=setting)
             for setting_element in xml_container:
                 root.append(setting_element)
         return root
 
-    settings_xml = get_settings()
+    settings_xml = get_settings(root=(keys_xml if f.format(g.settings_path) == f.format(g.keys_path) else None))
 
     if g.preview_from_path:
         preview_from_path = Path(f.format(g.preview_from_path))
@@ -162,8 +179,11 @@ def main() -> None:
     write_xml(about_xml, f.format(g.about_path))
     if updates_xml.getchildren():
         write_xml(updates_xml, f.format(g.updates_path))
-    if settings_xml.getchildren():
-        write_xml(settings_xml, f.format(g.settings_path))
+    if keys_xml.getchildren():
+        write_xml(keys_xml, f.format(g.keys_path))
+    if f.format(g.settings_path) != f.format(g.keys_path):
+        if settings_xml.getchildren():
+            write_xml(settings_xml, f.format(g.settings_path))
 
     pyperclip.copy(steam)
     print('-' * 100)
