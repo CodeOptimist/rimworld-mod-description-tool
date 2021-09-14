@@ -1,14 +1,16 @@
 # Copyright (C) 2019-2021  Christopher S. Galpin.  See /NOTICE.
+import argparse
 import os
 import re
 import sys
+import webbrowser
 from pathlib import Path
 from shutil import copy
 from typing import Any
 from typing import Optional
 
 import codeoptimist.yaml
-import pyperclip
+from ahkunwrapped import Script
 from codeoptimist.yaml import AttrDict
 from codeoptimist.yaml import formatter as f
 from lxml import etree
@@ -23,14 +25,20 @@ class Steam2Xml(str):
     pass
 
 
+CUR_DIR = Path(getattr(sys, '_MEIPASS', Path(__file__).parent))
 g: AttrDict
 # marks a scalar by wrapping it with a constructor we can check later
 add_constructor('!steam2xml', lambda l, n: Steam2Xml(l.construct_scalar(n)), Loader=SafeLoader)
 
+parser = argparse.ArgumentParser()
+parser.add_argument('path', help="path to mod yaml file")
+parser.add_argument('--auto-steam', help="opens browser and updates mod description on Steam", action="store_true")
+args = parser.parse_args()
+
 
 def main() -> None:
     global g
-    yaml_path = Path(sys.argv[1]).resolve()
+    yaml_path = Path(args.path).resolve()
     if yaml_path.suffix != '.yaml':
         exit(1)
     g = codeoptimist.yaml.load(yaml_path)
@@ -169,10 +177,26 @@ def main() -> None:
         if settings_xml.getchildren():
             write_xml(settings_xml, f.format(g.settings_path))
 
-    pyperclip.copy(steam)
+    ahk = Script.from_file(CUR_DIR / 'update_steam.ahk', g)
+
     print('-' * 100)
     print(steam)
     print('-' * 100)
+
+    update_error = 0
+    if args.auto_steam:
+        webbrowser.open(f'https://steamcommunity.com/sharedfiles/itemedittext/?id={g.published_file_id}')
+        clipboard = ahk.get('Clipboard')
+        update_error = ahk.f('UpdateSteam', steam)
+        if update_error == 0:
+            ahk.set('Clipboard', clipboard)
+            print(f"Successfully updated Steam description for \"{g.ModMetaData.name}\", id {g.published_file_id}.")
+        else:
+            print(update_error)
+            print("Failed to automatically update Steam description, manual paste required.")
+
+    if update_error != 0:
+        ahk.set('Clipboard', steam)
 
 
 if __name__ == '__main__':
