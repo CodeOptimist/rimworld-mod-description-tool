@@ -1,7 +1,9 @@
 .idea/
+__pycache__/
+build/
+dist/
+_ModDescriptionTool/
 venv/
 *.yaml
 !defaults.yaml
-!example_global.yaml
-!example_mod.yaml
-!example_beta.yaml
+!example_*.yaml

@@ -8,8 +8,10 @@ from ahkunwrapped import Script
 
 def run():
     script_path = os.path.join(Path(__file__).resolve().parent, 'main.py')
+    yaml_path = Path(sys.argv[1])
+    os.chdir(yaml_path.parent)
     try:
-        script = subprocess.run([sys.executable, script_path] + sys.argv[1:], stdout=subprocess.PIPE, check=True, encoding='utf-8', text=True)
+        script = subprocess.run([sys.executable, script_path] + [str(yaml_path)], stdout=subprocess.PIPE, check=True, encoding='utf-8', text=True)
         print(script.stdout)
         restart_rw()
     except subprocess.CalledProcessError as e:
